@@ -14,7 +14,7 @@ To set up **MergeSentinel** locally:
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-username/MergeSentinel.git
+   git clone https://github.com/cropalato/MergeSentinel.git
    ```
 
 2. **Navigate to the project directory:**
@@ -24,7 +24,8 @@ To set up **MergeSentinel** locally:
 
 3. **Build the application:**
    ```bash
-   go build
+   # export CGO_ENABLED=0 # if you want to create a static build
+   go build -a -o bin ./...
    ```
 
 4. Run the application:
@@ -111,4 +112,4 @@ This project is licensed under the MIT License. See the LICENSE file for details
 
 ## Contact
 
-If you have any questions, issues, or suggestions, feel free to open an issue or reach out to your-email@example.com.
+If you have any questions, issues, or suggestions, feel free to open an issue.
