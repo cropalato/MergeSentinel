@@ -13,20 +13,21 @@ import (
 	"encoding/json"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	validate "github.com/go-playground/validator/v10"
 )
 
 type ApprovRule struct {
-	ProjectId int   `json:"project_id"`
-	Approvals  []string `json:"approvals"`
-	MinApprov  int      `json:"min_approv"`
+	ProjectId int       `json:"project_id"  validate:"required,gt=0"`
+	Approvals []string  `json:"approvals"   validate:"required"`
+	MinApprov int       `json:"min_approv"  validate:"required,gt=0"`
 }
 
 type Config struct {
-	GitlabToken string `json:"gitlab_token"`
-	GitlabURL   string `json:"gitlab_url"`
-	Projects    []ApprovRule `json:"projects"`
-	PsqlConn    string `json:"psql_conn_url"`
-	CorsOrigin  string `json:"cors_origin"`
+	GitlabToken string       `json:"gitlab_token"   validate:"required,startswith=glpat-"`
+	GitlabURL   string       `json:"gitlab_url"     validate:"required,http_url"`
+	Projects    []ApprovRule `json:"projects"       validate:"required"`
+	PsqlConn    string       `json:"psql_conn_url"  validate:"required,startswith=postgres://"`
+	CorsOrigin  string       `json:"cors_origin"    validate:"required"`
 }
 
 // NewDefaultConfig reads configuration from environment variables and validates it
@@ -50,7 +51,14 @@ func NewConfig(config_file string) (*Config, error) {
 
 	// we initialize our Users array
 	var conf Config
-	json.Unmarshal(byteValue, &conf)
+	err = json.Unmarshal(byteValue, &conf)
+	if err != nil {
+		log.Fatal().Err(err).Send()
+	}
+	err = validate.New().Struct(conf)
+	if err != nil {
+		log.Fatal().Err(err).Send()
+	}
   
 	return &conf, nil
 }
