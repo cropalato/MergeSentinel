@@ -22,7 +22,7 @@ func TestNewConfig(t *testing.T) {
 
 	// Define a valid configuration
 	validConfig := `{
-		"gitlab_token": "test_token",
+		"gitlab_token": "glpat-Phuki3Xu5Rohghohrode",
 		"gitlab_url": "https://gitlab.com",
 		"projects": [
 			{
@@ -45,7 +45,7 @@ func TestNewConfig(t *testing.T) {
 		conf, err := NewConfig(configFile)
 		assert.NoError(t, err, "Expected no error when loading a valid config file")
 		assert.NotNil(t, conf, "Expected a non-nil config object")
-		assert.Equal(t, "test_token", conf.GitlabToken, "Unexpected GitlabToken")
+		assert.Equal(t, "glpat-Phuki3Xu5Rohghohrode", conf.GitlabToken, "Unexpected GitlabToken")
 		assert.Equal(t, "https://gitlab.com", conf.GitlabURL, "Unexpected GitlabURL")
 		assert.Len(t, conf.Projects, 1, "Expected one project in the config")
 		assert.Equal(t, 1, conf.Projects[0].ProjectId, "Unexpected ProjectId")
