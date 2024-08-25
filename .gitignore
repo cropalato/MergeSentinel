@@ -29,3 +29,9 @@ bin/*
 
 # Except the dummy.txt file
 !bin/dummy.txt
+
+# Ignore everything in the bin directory
+cmd/*
+
+# Except the dummy.txt file
+!cmd/merge-sentinel
