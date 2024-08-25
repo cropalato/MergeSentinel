@@ -41,10 +41,12 @@ To set up **MergeSentinel** locally:
 {
   "gitlab_token": "<token>",
   "gitlab_url": "https://<gitlab URL>",
+  "webhook_token": "<webhook token>",
   "projects": [
     {
       "project_id": <ID>,
       "approvals": ["<user1>", "<user2>", "<user3>"],
+      "webhook_token": "<webhook token>",
       "min_approv": 2
     }
   ],
@@ -56,10 +58,12 @@ To set up **MergeSentinel** locally:
 
 - **`gitlab_token`**: The personal access token for authenticating API requests to GitLab.
 - **`gitlab_url`**: The base URL of your GitLab instance.
+- **`webhook_token`**: The webhook token used in gitlab webhook calls. If not defined in project level, this one will be used.
 - **`projects`**: An array of project-specific configurations:
     - **`project_id`**: The ID of the GitLab project.
     - **`approvals`**: A list of users required to approve the merge request.
     - **`min_approv`**: The minimum number of approvals required to allow the merge request to proceed.
+    - **`webhook_token`**: The webhook token used in gitlab webhook calls.
 - **`psql_conn_url`**: The PostgreSQL connection URL for accessing the GitLab database, including user credentials, the fully qualified domain name (FQDN) of the GitLab PostgreSQL server, and the name of the database (**`gitlabhq_production`**).
 
 ## Usage
@@ -74,6 +78,21 @@ Example configuration:
 4. Save the webhook.
 
 **MergeSentinel** will now monitor merge requests and enforce your rules.
+
+## postgreSQL configuration
+
+MergeSentinel will call gitlab postgreSQL server to update merge request table. It will be a SELECT and an UPDATE query, like:
+```bash
+SELECT * FROM merge_requests WHERE iid = 1 AND target_project_id = 1;
+```
+```bash
+UPDATE merge_requests SET merge_status = 'cannot_be_merged', merge_error = ''Requires at least 2 approvals from [user1 user7]. WHERE iid = 1 AND target_project_id = 1;
+```
+You can want to create a user for that. can be something like that:
+```bash
+CREATE USER gitlab_approval WITH PASSWORD 'zoohoo6T';
+GRANT SELECT, UPDATE (merge_status,merge_error) ON TABLE merge_requests TO gitlab_approval;
+```
 
 ## Contributing
 
