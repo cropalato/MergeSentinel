@@ -90,8 +90,8 @@ UPDATE merge_requests SET merge_status = 'cannot_be_merged', merge_error = ''Req
 ```
 You can want to create a user for that. can be something like that:
 ```bash
-CREATE USER gitlab_approval WITH PASSWORD 'zoohoo6T';
-GRANT SELECT, UPDATE (merge_status,merge_error) ON TABLE merge_requests TO gitlab_approval;
+CREATE USER merge_sentinel WITH PASSWORD 'zoohoo6T';
+GRANT SELECT, UPDATE (merge_status,merge_error) ON TABLE merge_requests TO merge_sentinel;
 ```
 
 ## Contributing
