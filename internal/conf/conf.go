@@ -17,17 +17,19 @@ import (
 )
 
 type ApprovRule struct {
-	ProjectId int       `json:"project_id"  validate:"required,gt=0"`
-	Approvals []string  `json:"approvals"   validate:"required"`
-	MinApprov int       `json:"min_approv"  validate:"required,gt=0"`
+	ProjectId int       `json:"project_id"              validate:"gt=0,required"`
+	Approvals []string  `json:"approvals"               validate:"gt=0,required"`
+	MinApprov int       `json:"min_approv"              validate:"gt=0,required"`
+	WebHookToken string `json:"webhook_token,omitempty" validate:"omitempty,gt=0"`
 }
 
 type Config struct {
-	GitlabToken string       `json:"gitlab_token"   validate:"required,startswith=glpat-"`
-	GitlabURL   string       `json:"gitlab_url"     validate:"required,http_url"`
-	Projects    []ApprovRule `json:"projects"       validate:"required"`
-	PsqlConn    string       `json:"psql_conn_url"  validate:"required,startswith=postgres://"`
-	CorsOrigin  string       `json:"cors_origin"    validate:"required"`
+	GitlabToken string       `json:"gitlab_token"            validate:"required,startswith=glpat-"`
+	GitlabURL   string       `json:"gitlab_url"              validate:"required,http_url"`
+	Projects    []ApprovRule `json:"projects"                validate:"required"`
+	PsqlConn    string       `json:"psql_conn_url"           validate:"required,startswith=postgres://"`
+	CorsOrigin  string       `json:"cors_origin"             validate:"required"`
+	WebHookToken string      `json:"webhook_token,omitempty" validate:"omitempty,gt=0"`
 }
 
 // NewDefaultConfig reads configuration from environment variables and validates it

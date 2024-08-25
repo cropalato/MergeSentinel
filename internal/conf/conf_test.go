@@ -24,8 +24,10 @@ func TestNewConfig(t *testing.T) {
 	validConfig := `{
 		"gitlab_token": "glpat-Phuki3Xu5Rohghohrode",
 		"gitlab_url": "https://gitlab.com",
+		"webhook_token": "ddalsdnHAS8OP",
 		"projects": [
 			{
+				"webhook_token": "aaKJHJhasa122AS",
 				"project_id": 1,
 				"approvals": ["user1", "user2"],
 				"min_approv": 2
@@ -47,10 +49,12 @@ func TestNewConfig(t *testing.T) {
 		assert.NotNil(t, conf, "Expected a non-nil config object")
 		assert.Equal(t, "glpat-Phuki3Xu5Rohghohrode", conf.GitlabToken, "Unexpected GitlabToken")
 		assert.Equal(t, "https://gitlab.com", conf.GitlabURL, "Unexpected GitlabURL")
+		assert.Equal(t, "ddalsdnHAS8OP", conf.WebHookToken, "Unexpected WebHookToken")
 		assert.Len(t, conf.Projects, 1, "Expected one project in the config")
 		assert.Equal(t, 1, conf.Projects[0].ProjectId, "Unexpected ProjectId")
 		assert.Equal(t, []string{"user1", "user2"}, conf.Projects[0].Approvals, "Unexpected Approvals")
 		assert.Equal(t, 2, conf.Projects[0].MinApprov, "Unexpected MinApprov")
+		assert.Equal(t, "aaKJHJhasa122AS", conf.Projects[0].WebHookToken, "Unexpected WebHookToken")
 		assert.Equal(t, "postgres://user:password@localhost/dbname", conf.PsqlConn, "Unexpected PsqlConn")
 		assert.Equal(t, "https://example.com", conf.CorsOrigin, "Unexpected CorsOrigin")
 	})

@@ -10,15 +10,16 @@ package webservices
 
 import (
 	"encoding/json"
-	"net/http"
+	"errors"
 	"fmt"
 	"io"
-	"time"
+	"net/http"
 	"strings"
+	"time"
 
+	"github.com/cropalato/gitlabce-approval/internal/conf"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	"github.com/cropalato/gitlabce-approval/internal/conf"
 	"github.com/rs/zerolog/log"
 )
 
@@ -190,10 +191,15 @@ func (s *Service) State(w http.ResponseWriter, r *http.Request) {
 // PostApproval validate if MR has enough approvals.
 // It will return unauthorized http code if rule do not match the required condition.
 func (s *Service) PostApproval(w http.ResponseWriter, r *http.Request) {
+	var tmp_token string
 	// w.Header().Set("Access-Control-Allow-Origin", c.CorsOrigin)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	if r.Method == http.MethodOptions {
 		return
+	}
+	request_token, exist := r.Header["X-Gitlab-Token"]
+	if ! exist {
+		log.Warn().Msg("Missing 'X-Gitlab-Token' header.")
 	}
 	var callback GitlabMREventWebhookCallback
 	err := json.NewDecoder(r.Body).Decode(&callback)
@@ -212,6 +218,22 @@ func (s *Service) PostApproval(w http.ResponseWriter, r *http.Request) {
 		for _, p := range s.Config.Projects {
 			log.Debug().Int("p.ProjectId",p.ProjectId).Int("cb_project",cb_project).Send()
 			if p.ProjectId == cb_project {
+				tmp_token = p.WebHookToken
+				if tmp_token == "" {
+					tmp_token = s.Config.WebHookToken
+				}
+				if (request_token[0] != "" && tmp_token != "" && request_token[0] != tmp_token) ||
+				     (request_token[0] == "" && tmp_token != "") {
+					err_msg := "mismatching webhook and local tokens."
+					err := errors.New(err_msg)
+					log.Error().Err(err).Send()
+		      s.updateMergeStatus(cb_project, cb_mr_id, "cannot_be_merged", err_msg)
+		      http.Error(w, err.Error(), http.StatusBadRequest)
+      		return
+				}
+				if request_token[0] != "" && tmp_token == "" {
+					log.Warn().Msg("Callback with 'X-Gitlab-Token' header, but missing local token config to validate." )
+				}
 				s.reinforceMrRule(p, cb_mr_id)
 			}
 		}
