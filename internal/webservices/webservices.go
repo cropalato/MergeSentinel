@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cropalato/gitlabce-approval/internal/conf"
+	"github.com/cropalato/MergeSentinel/internal/conf"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/rs/zerolog/log"

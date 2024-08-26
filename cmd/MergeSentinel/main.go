@@ -21,8 +21,8 @@ import (
 	"github.com/gorilla/mux"
   "github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/cropalato/gitlabce-approval/internal/varenv"
-	"github.com/cropalato/gitlabce-approval/internal/webservices"
+	"github.com/cropalato/MergeSentinel/internal/varenv"
+	"github.com/cropalato/MergeSentinel/internal/webservices"
 )
 
 func main() {
@@ -30,7 +30,7 @@ func main() {
 	listen := flag.String("listen", varenv.LookupEnvOrString("GLCE_APPROV_LISTEN", ":8080"), "IP and port used by the service. format: '[<ip>]:<port>'. default: ':8080'")
 	// the dafault password is 'admin'. ypu can use create a new one using
 	// python -c 'import bcrypt; print(bcrypt.hashpw(b"PASSWORD", bcrypt.gensalt(rounds=15)).decode("ascii"))'
-	cfg_path := flag.String("cfg_path", varenv.LookupEnvOrString("GLCE_CONF_PATH", ""), "config file path")
+	cfg_path := flag.String("cfg_path", varenv.LookupEnvOrString("GLCE_CONF_PATH", "msentinel.json"), "config file path")
 	debug := flag.Bool("debug", false, "sets log level to debug")
 	flag.Parse()
 
