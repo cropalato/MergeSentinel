@@ -41,5 +41,7 @@ jobs:
         with:
           platforms: linux/amd64
           push: true
+          sbom: true
+          provenance: mode=max
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
