@@ -79,9 +79,12 @@ func main() {
 			viewConfig(config)
 		case "Update Global Settings":
 			updateGlobalSettings(&config)
-		case "Exit":
+		case "Save and Exit":
 			// Save any changes to configuration before exiting
 			saveConfig(config, *configFile)
+			return
+		case "Exit":
+			// Save any changes to configuration before exiting
 			return
 		}
 	}
@@ -124,6 +127,7 @@ func promptAction() string {
 			"Add/Update Project",
 			"View Configuration",
 			"Update Global Settings",
+			"Save and Exit",
 			"Exit",
 		},
 	}
