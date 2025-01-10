@@ -34,4 +34,4 @@ bin/*
 cmd/*
 
 # Except the dummy.txt file
-!cmd/merge-sentinel
+!cmd/MergeSentinel*
