@@ -1,7 +1,0 @@
-{
-    "gitlab_token": "",
-    "gitlab_url": "",
-    "webhook_token": "",
-    "projects": [],
-    "psql_conn_url": ""
-}

@@ -74,11 +74,11 @@ func main() {
 		action := promptAction()
 		switch action {
 		case "Add/Update Project":
-			addProject(git, &config)
+			addProject(git, &config, *configFile)
 		case "View Configuration":
 			viewConfig(config)
 		case "Update Global Settings":
-			updateGlobalSettings(&config)
+			updateGlobalSettings(&config, *configFile)
 		case "Save and Exit":
 			// Save any changes to configuration before exiting
 			saveConfig(config, *configFile)
@@ -140,7 +140,7 @@ func promptAction() string {
 	return result
 }
 
-func updateGlobalSettings(config *Config) {
+func updateGlobalSettings(config *Config, configFile string) {
 	fmt.Println("\nUpdating Global Settings")
 
 	// GitLab Token
@@ -179,11 +179,11 @@ func updateGlobalSettings(config *Config) {
 		config.PsqlConnURL = result
 	}
 
-	saveConfig(*config)
+	saveConfig(*config, configFile)
 	fmt.Println("Global settings updated successfully!")
 }
 
-func addProject(git *gitlab.Client, config *Config) {
+func addProject(git *gitlab.Client, config *Config, configFile string) {
 	// List projects
 	projects, _, err := git.Projects.ListProjects(&gitlab.ListProjectsOptions{})
 	if err != nil {
@@ -308,7 +308,7 @@ func addProject(git *gitlab.Client, config *Config) {
 		config.Projects = append(config.Projects, projectConfig)
 	}
 
-	saveConfig(*config)
+	saveConfig(*config, configFile)
 	fmt.Println("Project configuration updated successfully!")
 }
 

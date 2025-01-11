@@ -33,5 +33,8 @@ bin/*
 # Ignore everything in the bin directory
 cmd/*
 
-# Except the dummy.txt file
+# Except tools
 !cmd/MergeSentinel*
+
+
+cmd/MergeSentinel-config/gitlab-config.json
