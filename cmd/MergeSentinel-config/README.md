@@ -25,4 +25,4 @@ go run main.go
 
 # Preview
 
-![Preview](https://raw.githubusercontent.com/cropalato/MergeSentinel/tree/11-config-tool/screen1.png)
+![Preview](https://raw.githubusercontent.com/cropalato/MergeSentinel/refs/heads/11-config-tool/cmd/MergeSentinel-config/screen1.png)
