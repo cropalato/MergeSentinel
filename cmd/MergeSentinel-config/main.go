@@ -1,340 +1,287 @@
-// main.go
 package main
 
 import (
 	"encoding/json"
-	"flag"
-	"fmt"
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
-	"github.com/manifoldco/promptui"
+	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
 	"gitlab.com/gitlab-org/api/client-go"
 )
 
-type ProjectConfig struct {
-	ProjectID    int      `json:"project_id"`
+// Project e Config são as estruturas do seu JSON
+type Project struct {
+	ProjID       int      `json:"project_id"`
 	Approvals    []string `json:"approvals"`
 	WebhookToken string   `json:"webhook_token"`
-	MinApprovals int      `json:"min_approv"`
+	MinApprov    int      `json:"min_approv"`
 }
 
 type Config struct {
-	GitlabToken  string          `json:"gitlab_token"`
-	GitlabURL    string          `json:"gitlab_url"`
-	WebhookToken string          `json:"webhook_token"`
-	Projects     []ProjectConfig `json:"projects"`
-	PsqlConnURL  string          `json:"psql_conn_url"`
+	GLabToken    string    `json:"gitlab_token"`
+	GLabURL      string    `json:"gitlab_url"`
+	WebhookToken string    `json:"webhook_token"`
+	PgresConn    string    `json:psql_conn_url`
+	Projects     []Project `json:"projects"`
 }
+
+const defaultConfigPath = "config.json"
+
+// preview é um TextView global para facilitar a atualização
+var preview *tview.TextView
+
+// projectForm será o formulário usado para editar um project.
+// Declaramos como variável global ou variável local no main, mas antes de as funções que a usam.
+var projectForm *tview.Form
 
 func main() {
-	// Define command line flags
-	gitlabURL := flag.String("url", "", "GitLab instance URL (e.g., https://gitlab.example.com)")
-	gitlabToken := flag.String("token", "", "GitLab personal access token")
-	configFile := flag.String("config", "gitlab-config.json", "Path to configuration file")
-
-	// Parse command line arguments
-	flag.Parse()
-
-	// Load existing configuration or create new
-	config := loadConfig(*configFile)
-
-	// Override config with command line arguments if provided
-	if *gitlabURL != "" {
-		config.GitlabURL = *gitlabURL
-	}
-	if *gitlabToken != "" {
-		config.GitlabToken = *gitlabToken
-	}
-
-	// Validate required configuration
-	if config.GitlabURL == "" || config.GitlabToken == "" {
-		fmt.Println("Error: GitLab URL and token are required.")
-		fmt.Println("Please provide them either through the configuration file or command line arguments:")
-		flag.PrintDefaults()
+	// Tenta carregar config
+	config, err := loadConfig(defaultConfigPath)
+	if err != nil {
+		log.Printf("Não foi possível carregar '%s'. %s Usando config vazio.\n", defaultConfigPath, err)
 		os.Exit(1)
+		config = &Config{}
 	}
 
-	// Initialize GitLab client using config values
-	git, err := gitlab.NewClient(config.GitlabToken, gitlab.WithBaseURL(config.GitlabURL))
-	if err != nil {
-		log.Fatalf("Failed to create GitLab client: %v", err)
-	}
+	// Inicia a aplicação
+	app := tview.NewApplication()
 
-	// Verify GitLab connection
-	_, _, err = git.Users.ListUsers(&gitlab.ListUsersOptions{})
-	if err != nil {
-		log.Fatalf("Failed to connect to GitLab: %v", err)
-	}
+	// Formulário para campos globais
+	glbField1 := tview.NewInputField().
+		SetLabel("Gitlab URL   ").
+		SetText(config.GLabURL).
+		SetChangedFunc(func(text string) {
+			config.GLabURL = text
+			refreshPreview(preview, config)
+		})
+	glbField2 := tview.NewInputField().
+		SetLabel("Gitlab Token").
+		SetText(config.GLabToken).SetChangedFunc(func(text string) {
+		config.GLabToken = text
+		refreshPreview(preview, config)
+	})
+	glbField3 := tview.NewInputField().
+		SetLabel("Webhook Token").
+		SetText(config.WebhookToken).SetChangedFunc(func(text string) {
+		config.WebhookToken = text
+		refreshPreview(preview, config)
+	})
+	glbField4 := tview.NewInputField().
+		SetLabel("Postgres connection URL").
+		SetText(config.PgresConn).SetChangedFunc(func(text string) {
+		config.PgresConn = text
+		refreshPreview(preview, config)
+	})
+	fields := []*tview.InputField{glbField1, glbField2, glbField3, glbField4}
 
-	fmt.Printf("Successfully connected to GitLab at %s\n", config.GitlabURL)
-
-	for {
-		action := promptAction()
-		switch action {
-		case "Add/Update Project":
-			addProject(git, &config, *configFile)
-		case "View Configuration":
-			viewConfig(config)
-		case "Update Global Settings":
-			updateGlobalSettings(&config, *configFile)
-		case "Save and Exit":
-			// Save any changes to configuration before exiting
-			saveConfig(config, *configFile)
-			return
-		case "Exit":
-			// Save any changes to configuration before exiting
-			return
-		}
-	}
-}
-
-func loadConfig(configFile string) Config {
-	data, err := os.ReadFile(configFile)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// Create new config with empty values
-			return Config{
-				Projects: make([]ProjectConfig, 0),
+	// Set up Tab / Shift+Tab navigation using DoneFunc
+	for i, f := range fields {
+		idx := i
+		f.SetDoneFunc(func(key tcell.Key) {
+			switch key {
+			case tcell.KeyTab:
+				// Move focus to the next field (wrap around)
+				next := (idx + 1) % len(fields)
+				app.SetFocus(fields[next])
+			case tcell.KeyBacktab:
+				// Move focus to the previous field (wrap around)
+				prev := (idx - 1 + len(fields)) % len(fields)
+				app.SetFocus(fields[prev])
+			case tcell.KeyEnter:
+				// Optional: If you want Enter to move forward
+				next := (idx + 1) % len(fields)
+				app.SetFocus(fields[next])
 			}
-		}
-		log.Fatalf("Error reading config file: %v", err)
+		})
 	}
+	// Create a Grid layout: 3 rows, 3 columns
+	grid := tview.NewGrid().
+		SetRows(1, 1).   // 3 rows
+		SetColumns(0, 0) // 3 columns (expand to fit)
+	grid.SetBorder(true).
+		SetTitle(" Global ").
+		SetTitleAlign(tview.AlignLeft)
 
-	var config Config
-	if err := json.Unmarshal(data, &config); err != nil {
-		log.Fatalf("Error parsing config file: %v", err)
-	}
-	return config
-}
+	grid.AddItem(glbField1, 0, 0, 1, 1, 0, 0, true)
+	grid.AddItem(glbField2, 0, 1, 1, 1, 0, 0, false)
+	grid.AddItem(glbField3, 1, 0, 1, 1, 0, 0, false)
 
-func saveConfig(config Config, configFile string) {
-	data, err := json.MarshalIndent(config, "", "    ")
-	if err != nil {
-		log.Fatalf("Error encoding config: %v", err)
-	}
+	grid.AddItem(glbField4, 1, 1, 1, 1, 0, 0, false)
 
-	if err := os.WriteFile(configFile, data, 0644); err != nil {
-		log.Fatalf("Error saving config file: %v", err)
-	}
-}
+	// Lista de projects
+	projectsList := tview.NewList()
+	projectsList.ShowSecondaryText(false).
+		SetBorder(true).
+		SetTitle("Projects").
+		SetTitleAlign(tview.AlignLeft)
 
-func promptAction() string {
-	prompt := promptui.Select{
-		Label: "Select Action",
-		Items: []string{
-			"Add/Update Project",
-			"View Configuration",
-			"Update Global Settings",
-			"Save and Exit",
-			"Exit",
-		},
-	}
+	// Inicializa o formulário de project
+	projectForm = tview.NewForm()
+	projectForm.SetBorder(true).
+		SetTitle("Project").
+		SetTitleAlign(tview.AlignLeft)
 
-	_, result, err := prompt.Run()
-	if err != nil {
-		log.Fatalf("Prompt failed: %v", err)
-	}
+	// Área de pré-visualização do JSON
+	preview = tview.NewTextView()
+	preview.SetDynamicColors(true).
+		SetBorder(true).
+		SetTitle("JSON Preview").
+		SetTitleAlign(tview.AlignLeft)
 
-	return result
-}
+	refreshPreview(preview, config)
 
-func updateGlobalSettings(config *Config, configFile string) {
-	fmt.Println("\nUpdating Global Settings")
-
-	// GitLab Token
-	prompt := promptui.Prompt{
-		Label:   "GitLab Token",
-		Default: config.GitlabToken,
-	}
-	if result, err := prompt.Run(); err == nil {
-		config.GitlabToken = result
-	}
-
-	// GitLab URL
-	prompt = promptui.Prompt{
-		Label:   "GitLab URL (e.g., https://gitlab.example.com)",
-		Default: config.GitlabURL,
-	}
-	if result, err := prompt.Run(); err == nil {
-		config.GitlabURL = result
-	}
-
-	// Webhook Token
-	prompt = promptui.Prompt{
-		Label:   "Global Webhook Token",
-		Default: config.WebhookToken,
-	}
-	if result, err := prompt.Run(); err == nil {
-		config.WebhookToken = result
-	}
-
-	// PostgreSQL Connection URL
-	prompt = promptui.Prompt{
-		Label:   "PostgreSQL Connection URL",
-		Default: config.PsqlConnURL,
-	}
-	if result, err := prompt.Run(); err == nil {
-		config.PsqlConnURL = result
-	}
-
-	saveConfig(*config, configFile)
-	fmt.Println("Global settings updated successfully!")
-}
-
-func addProject(git *gitlab.Client, config *Config, configFile string) {
-	// List projects
-	projects, _, err := git.Projects.ListProjects(&gitlab.ListProjectsOptions{})
-	if err != nil {
-		log.Printf("Error listing projects: %v", err)
-		return
-	}
-
-	projectNames := make([]string, len(projects))
-	for i, project := range projects {
-		projectNames[i] = fmt.Sprintf("%s (ID: %d)", project.Name, project.ID)
-	}
-
-	prompt := promptui.Select{
-		Label: "Select Project",
-		Items: projectNames,
-	}
-
-	index, _, err := prompt.Run()
-	if err != nil {
-		log.Printf("Project selection failed: %v", err)
-		return
-	}
-
-	selectedProject := projects[index]
-
-	// Check if project already exists in config
-	var projectConfig ProjectConfig
-	projectIndex := -1
-	for i, p := range config.Projects {
-		if p.ProjectID == selectedProject.ID {
-			projectConfig = p
-			projectIndex = i
-			break
-		}
-	}
-
-	// If project doesn't exist, initialize with defaults
-	if projectIndex == -1 {
-		projectConfig = ProjectConfig{
-			ProjectID:    selectedProject.ID,
-			WebhookToken: config.WebhookToken, // Use global webhook token as default
-			MinApprovals: 2,                   // Default minimum approvals
-		}
-	}
-
-	// List users
-	users, _, err := git.Users.ListUsers(&gitlab.ListUsersOptions{})
-	if err != nil {
-		log.Printf("Error listing users: %v", err)
-		return
-	}
-
-	// Select approvers
-	var selectedUsers []string
-	for {
-		userNames := make([]string, len(users))
-		for i, user := range users {
-			userNames[i] = user.Username
-		}
-		userNames = append(userNames, "Done")
-
-		prompt := promptui.Select{
-			Label: "Select Approvers (choose 'Done' when finished)",
-			Items: userNames,
-		}
-
-		index, result, err := prompt.Run()
-		if err != nil {
-			log.Printf("User selection failed: %v", err)
-			return
-		}
-
-		if result == "Done" {
-			break
-		}
-
-		selectedUsers = append(selectedUsers, users[index].Username)
-	}
-
-	// Update project configuration
-	projectConfig.Approvals = selectedUsers
-
-	// Prompt for minimum approvals
-	minApprovPrompt := promptui.Prompt{
-		Label:   "Minimum Required Approvals",
-		Default: strconv.Itoa(projectConfig.MinApprovals),
-		Validate: func(input string) error {
-			num, err := strconv.Atoi(input)
+	git, _ := gitlab.NewClient(config.GLabToken, gitlab.WithBaseURL(config.GLabURL))
+	// Função para atualizar a lista com os itens do config
+	populateProjectsList := func() {
+		projectsList.Clear()
+		for i, p := range config.Projects {
+			idx := i
+			pInfo, _, err := git.Projects.GetProject(p.ProjID, nil)
 			if err != nil {
-				return fmt.Errorf("please enter a valid number")
+				log.Fatalf("Projects.GetProject returns an error: %v", err)
 			}
-			if num < 1 {
-				return fmt.Errorf("minimum approvals must be at least 1")
-			}
-			if num > len(selectedUsers) {
-				return fmt.Errorf("minimum approvals cannot be greater than number of approvers")
-			}
-			return nil
-		},
-	}
-
-	if result, err := minApprovPrompt.Run(); err == nil {
-		projectConfig.MinApprovals, _ = strconv.Atoi(result)
-	}
-
-	// Prompt for project-specific webhook token
-	webhookPrompt := promptui.Prompt{
-		Label:   "Project Webhook Token (press enter to use global token)",
-		Default: projectConfig.WebhookToken,
-	}
-
-	if result, err := webhookPrompt.Run(); err == nil {
-		if result != "" {
-			projectConfig.WebhookToken = result
+			projectsList.AddItem(pInfo.PathWithNamespace, "", 0, func() {
+				loadProjectForm(projectForm, config, idx, preview)
+				app.SetFocus(projectForm)
+				refreshPreview(preview, config)
+			})
 		}
 	}
 
-	// Update or add project to configuration
-	if projectIndex >= 0 {
-		config.Projects[projectIndex] = projectConfig
-	} else {
-		config.Projects = append(config.Projects, projectConfig)
+	// Container vertical (Flex) para a lista + botões
+	projectsBox := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(projectsList, 0, 1, true)
+
+	// Botão Adicionar
+	addProjectButton := tview.NewButton("[green::b]+ Adicionar Project").SetSelectedFunc(func() {
+		novoProject := Project{
+			ProjID:       0,
+			Approvals:    []string{},
+			WebhookToken: "",
+			MinApprov:    0,
+		}
+		config.Projects = append(config.Projects, novoProject)
+		populateProjectsList()
+		refreshPreview(preview, config)
+	})
+
+	// Botão Remover
+	removeProjectButton := tview.NewButton("[red::b]- Remover Project Selecionado").SetSelectedFunc(func() {
+		index := projectsList.GetCurrentItem()
+		if index >= 0 && index < len(config.Projects) {
+			config.Projects = append(config.Projects[:index], config.Projects[index+1:]...)
+			populateProjectsList()
+			clearProjectForm(projectForm)
+			refreshPreview(preview, config)
+		}
+	})
+
+	projectsBox.AddItem(addProjectButton, 1, 0, false)
+	projectsBox.AddItem(removeProjectButton, 1, 0, false)
+
+	// Meio: lista à esquerda, form de project à direita
+	middleFlex := tview.NewFlex().SetDirection(tview.FlexColumn).
+		AddItem(projectsBox, 0, 1, true).
+		AddItem(projectForm, 0, 2, false)
+
+	mainFlex := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(grid, 4, 1, true).
+		AddItem(middleFlex, 0, 1, true)
+
+	// Raiz: mainFlex em cima, preview embaixo
+	rootFlex := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(mainFlex, 0, 4, true).
+		AddItem(preview, 10, 1, false)
+
+	// Preenche a lista inicialmente
+	populateProjectsList()
+
+	app.SetRoot(rootFlex, true)
+	app.SetFocus(projectsBox)
+
+	// Executa o loop
+	if err := app.Run(); err != nil {
+		log.Fatalf("Erro ao executar tview: %v\n", err)
 	}
 
-	saveConfig(*config, configFile)
-	fmt.Println("Project configuration updated successfully!")
+	// Ao sair, salva a config
+	if err := saveConfig(defaultConfigPath, config); err != nil {
+		log.Printf("Erro ao salvar config: %v\n", err)
+	}
 }
 
-func viewConfig(config Config) {
-	// Mask sensitive information
-	displayConfig := config
-	if displayConfig.GitlabToken != "" {
-		displayConfig.GitlabToken = "********"
-	}
-	if displayConfig.WebhookToken != "" {
-		displayConfig.WebhookToken = "********"
-	}
-	for i := range displayConfig.Projects {
-		if displayConfig.Projects[i].WebhookToken != "" {
-			displayConfig.Projects[i].WebhookToken = "********"
-		}
-	}
-	// Mask PostgreSQL password in connection URL
-	if displayConfig.PsqlConnURL != "" {
-		displayConfig.PsqlConnURL = "********"
-	}
+// ----------------------------------------------------------------------------
+// Funções auxiliares
+// ----------------------------------------------------------------------------
 
-	data, err := json.MarshalIndent(displayConfig, "", "    ")
+func loadConfig(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		log.Printf("Error encoding config for display: %v", err)
+		return nil, err
+	}
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+func saveConfig(path string, cfg *Config) error {
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
+}
+
+func refreshPreview(tv *tview.TextView, cfg *Config) {
+	if tv == nil {
 		return
 	}
-	fmt.Println(string(data))
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		tv.SetText("[red]Erro ao gerar JSON[/red]")
+		return
+	}
+	tv.SetText(string(data))
+}
+
+func loadProjectForm(form *tview.Form, cfg *Config, idx int, preview *tview.TextView) {
+	//form.Clear(true)
+	if idx < 0 || idx >= len(cfg.Projects) {
+		return
+	}
+	p := &cfg.Projects[idx]
+
+	form.AddInputField("Project id", strconv.Itoa(p.ProjID), 5, tview.InputFieldInteger, func(text string) {
+		n, _ := strconv.Atoi(text)
+		p.ProjID = n
+		refreshPreview(preview, cfg)
+	})
+	form.AddInputField("Min num of approvals", strconv.Itoa(p.MinApprov), 5, tview.InputFieldInteger, func(text string) {
+		n, _ := strconv.Atoi(text)
+		p.MinApprov = n
+		refreshPreview(preview, cfg)
+	})
+	tmp_app := strings.Join(p.Approvals, ",")
+	form.AddInputField("Approvals", tmp_app, 30, nil, func(text string) {
+		p.Approvals = strings.Split(text, ",")
+		refreshPreview(preview, cfg)
+	})
+	form.AddInputField("Webhook Token", p.WebhookToken, 30, nil, func(text string) {
+		p.WebhookToken = text
+		refreshPreview(preview, cfg)
+	})
+
+	form.AddButton("Salvar", func() {
+		refreshPreview(preview, cfg)
+	})
+	form.AddButton("Cancelar", func() {})
+}
+
+func clearProjectForm(form *tview.Form) {
+	form.Clear(true)
 }
