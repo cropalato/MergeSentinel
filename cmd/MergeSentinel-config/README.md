@@ -22,3 +22,7 @@ echo "{ \"gitlab_token\": \"${GITLAB_API_KEY}\", \"gitlab_url\": \"http://gitlab
 ```bash
 go run main.go
 ```
+
+# Preview
+
+![Preview](https://raw.githubusercontent.com/cropalato/MergeSentinel/tree/11-config-tool/screen1.png)
