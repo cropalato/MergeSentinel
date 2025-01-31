@@ -187,13 +187,6 @@ func main() {
 			app.SetFocus(glbField1)
 			return event
 		}
-		// case tcell.KeyEnter:
-		// 	// Block the default "select" if you want
-		// 	// Or do something custom
-		// 	// ...
-		// 	// return nil to consume
-		// 	return nil
-		// }
 
 		// Check for rune-based events
 		if event.Key() == tcell.KeyRune {
@@ -220,34 +213,6 @@ func main() {
 	projectsBox := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(projectsList, 0, 1, true)
 
-		/*
-			// Botão Adicionar
-			addProjectButton := tview.NewButton("[green::b]+ Adicionar Project").SetSelectedFunc(func() {
-				novoProject := Project{
-					ProjID:       0,
-					Approvals:    []string{},
-					WebhookToken: "",
-					MinApprov:    0,
-				}
-				config.Projects = append(config.Projects, novoProject)
-				populateProjectsList()
-				refreshPreview(preview, config)
-			})
-
-			// Botão Remover
-			removeProjectButton := tview.NewButton("[red::b]- Remover Project Selecionado").SetSelectedFunc(func() {
-				index := projectsList.GetCurrentItem()
-				if index >= 0 && index < len(config.Projects) {
-					config.Projects = append(config.Projects[:index], config.Projects[index+1:]...)
-					populateProjectsList()
-					clearProjectForm(projectForm)
-					refreshPreview(preview, config)
-				}
-			})
-
-			projectsBox.AddItem(addProjectButton, 1, 0, false)
-			projectsBox.AddItem(removeProjectButton, 1, 0, false)
-		*/
 	// Meio: lista à esquerda, form de project à direita
 	middleFlex := tview.NewFlex().SetDirection(tview.FlexColumn).
 		AddItem(projectsBox, 0, 1, true).
