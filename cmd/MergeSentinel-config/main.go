@@ -389,6 +389,10 @@ func loadProjectForm(form *tview.Form, cfg *Config, idx int, preview *tview.Text
 		isNew = false
 		form.AddTextView("project id", strconv.Itoa(p.ProjID), 0, 1, true, false)
 	}
+	form.AddInputField("Webhook Token", p.WebhookToken, 30, nil, func(text string) {
+		p.WebhookToken = text
+		//refreshPreview(preview, cfg)
+	})
 	form.AddInputField("Min num of approvals", strconv.Itoa(p.MinApprov), 5, tview.InputFieldInteger, func(text string) {
 		n, _ := strconv.Atoi(text)
 		p.MinApprov = n
@@ -397,10 +401,6 @@ func loadProjectForm(form *tview.Form, cfg *Config, idx int, preview *tview.Text
 	tmp_app := strings.Join(p.Approvals, ",")
 	form.AddInputField("Approvals", tmp_app, 30, nil, func(text string) {
 		p.Approvals = strings.Split(text, ",")
-		//refreshPreview(preview, cfg)
-	})
-	form.AddInputField("Webhook Token", p.WebhookToken, 30, nil, func(text string) {
-		p.WebhookToken = text
 		//refreshPreview(preview, cfg)
 	})
 

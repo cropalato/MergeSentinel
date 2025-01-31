@@ -3,6 +3,7 @@ module gitlab-manager
 go 1.23.4
 
 require (
+	github.com/gdamore/tcell v1.4.0
 	github.com/gdamore/tcell/v2 v2.8.1
 	github.com/rivo/tview v0.0.0-20241227133733-17b7edb88c57
 	gitlab.com/gitlab-org/api/client-go v0.119.0
