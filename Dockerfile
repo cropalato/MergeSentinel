@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.23 AS build-stage
+FROM golang:1.25 AS build-stage
 
 # Set destination for COPY
 WORKDIR /app
@@ -17,7 +17,7 @@ COPY . ./
 RUN CGO_ENABLED=0 GOOS=linux go build -o bin ./...
 
 # Deploy the application binary into a lean image
-FROM gcr.io/distroless/base-debian11 AS build-release-stage
+FROM gcr.io/distroless/base-debian12 AS build-release-stage
 
 WORKDIR /
 
