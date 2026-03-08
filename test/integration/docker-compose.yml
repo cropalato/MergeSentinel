@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mstest
+      POSTGRES_PASSWORD: mstest
+      POSTGRES_DB: mergesentinel
+    ports:
+      - "15432:5432"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mstest -d mergesentinel"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
