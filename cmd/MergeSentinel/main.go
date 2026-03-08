@@ -14,39 +14,44 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/mux"
-  "github.com/rs/zerolog"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
 	"github.com/cropalato/MergeSentinel/internal/varenv"
 	"github.com/cropalato/MergeSentinel/internal/webservices"
 )
 
 func main() {
-  zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	listen := flag.String("listen", varenv.LookupEnvOrString("GLCE_APPROV_LISTEN", ":8080"), "IP and port used by the service. format: '[<ip>]:<port>'. default: ':8080'")
-	// the dafault password is 'admin'. ypu can use create a new one using
-	// python -c 'import bcrypt; print(bcrypt.hashpw(b"PASSWORD", bcrypt.gensalt(rounds=15)).decode("ascii"))'
 	cfg_path := flag.String("cfg_path", varenv.LookupEnvOrString("GLCE_CONF_PATH", "msentinel.json"), "config file path")
 	debug := flag.Bool("debug", false, "sets log level to debug")
 	flag.Parse()
 
-	// Default level for this example is info, unless debug flag is present
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	if *debug {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 
-	cfg, _ := webservices.LoadConfig(*cfg_path)
+	cfg, err := webservices.LoadConfig(*cfg_path)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed loading configuration")
+	}
+	defer cfg.DB.Close()
 
-	err := cfg.ReinforceAllMrRule()
+	err = cfg.ReinforceAllMrRule()
 	if err != nil {
 		log.Fatal().Msg("Failed updating database")
 	}
-	// Call all projects in config file and reinforce merge approval rule
 
 	srv := http.Server{
 		Addr:              *listen,
@@ -60,7 +65,27 @@ func main() {
 	r.Use(mux.CORSMethodMiddleware(r))
 	r.HandleFunc("/state", cfg.State).Methods(http.MethodGet, http.MethodOptions)
 	r.HandleFunc("/api/v1/approve", cfg.PostApproval).Methods(http.MethodPost, http.MethodOptions)
-	http.Handle("/", r)
-  log.Info().Str("listening", *listen).Msg("Starting http service")
-	srv.ListenAndServe()
+	srv.Handler = r
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		log.Info().Str("listening", *listen).Msg("Starting http service")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal().Err(err).Msg("HTTP server error")
+		}
+	}()
+
+	<-quit
+	log.Info().Msg("Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Error().Err(err).Msg("Server forced to shutdown")
+	}
+
+	log.Info().Msg("Server exited")
 }
